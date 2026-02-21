@@ -185,13 +185,31 @@ export default function App() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const email = (e.target as any).email.value;
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password: 'password' })
-    });
-    const data = await res.json();
-    setUser(data.user);
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: 'password' })
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+      
+      if (data.user) {
+        setUser(data.user);
+      } else {
+        throw new Error('No user data received');
+      }
+    } catch (error: any) {
+      console.error('Login error:', error);
+      alert(lang === 'ar' ? `فشل تسجيل الدخول: ${error.message}` : `Login failed: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGenerate = async () => {
