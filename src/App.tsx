@@ -66,6 +66,11 @@ const translations = {
     clinicName: 'Clinic Name',
     save: 'Save Changes',
     loginTitle: 'Sign In',
+    signUpTitle: 'Create Account',
+    noAccount: "Don't have an account?",
+    hasAccount: 'Already have an account?',
+    signUp: 'Sign Up',
+    demoMode: 'Try Demo Mode',
     password: 'Password',
     contactSupport: 'Contact support to change your registered email.',
     clinicPlaceholder: 'City Medical Center'
@@ -108,6 +113,11 @@ const translations = {
     clinicName: 'اسم العيادة',
     save: 'حفظ التغييرات',
     loginTitle: 'تسجيل الدخول',
+    signUpTitle: 'إنشاء حساب',
+    noAccount: 'ليس لديك حساب؟',
+    hasAccount: 'لديك حساب بالفعل؟',
+    signUp: 'إنشاء حساب',
+    demoMode: 'تجربة الوضع التجريبي',
     password: 'كلمة المرور',
     contactSupport: 'اتصل بالدعم لتغيير بريدك الإلكتروني المسجل.',
     clinicPlaceholder: 'مركز المدينة الطبي'
@@ -159,6 +169,7 @@ export default function App() {
   const [lang, setLang] = useState<Language>('en');
   const [activeTab, setActiveTab] = useState<'dashboard' | 'history' | 'settings'>('dashboard');
   const [loading, setLoading] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [history, setHistory] = useState<MedicalCase[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -204,9 +215,19 @@ export default function App() {
 
   const fetchHistory = async () => {
     if (!user) return;
-    const res = await fetch(`/api/history/${user.id}`);
-    const data = await res.json();
-    setHistory(data);
+    try {
+      const res = await fetch(`/api/history/${user.id}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setHistory(data);
+      } else {
+        console.error('History data is not an array:', data);
+        setHistory([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch history:', error);
+      setHistory([]);
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -216,14 +237,11 @@ export default function App() {
     
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error } = authMode === 'login' 
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       if (data.user) {
         setUser({
@@ -232,11 +250,21 @@ export default function App() {
         });
       }
     } catch (error: any) {
-      console.error('Login error:', error);
-      alert(error.message);
+      console.error('Auth error:', error);
+      const message = error.message === 'Invalid login credentials' 
+        ? (lang === 'ar' ? 'بيانات الدخول غير صحيحة. يرجى إنشاء حساب جديد أو استخدام الوضع التجريبي.' : 'Invalid login credentials. Please sign up or use Demo Mode.')
+        : error.message;
+      alert(message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDemoMode = () => {
+    setUser({
+      id: 'demo-user',
+      email: 'demo@clinical-copilot.ai'
+    });
   };
 
   const handleGenerate = async () => {
@@ -297,7 +325,7 @@ export default function App() {
             <div className="bg-clinical-accent p-4 rounded-2xl text-white mb-4 shadow-lg shadow-clinical-accent/20">
               <Stethoscope size={40} />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">{t.title}</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{authMode === 'login' ? t.loginTitle : t.signUpTitle}</h1>
             <p className="text-gray-500 text-sm">{t.subtitle}</p>
           </div>
           <form onSubmit={handleLogin} className="space-y-4">
@@ -309,10 +337,31 @@ export default function App() {
               <label className="block text-sm font-medium text-gray-700 mb-1">{t.password}</label>
               <input name="password" type="password" required className="clinical-input" placeholder="••••••••" />
             </div>
-            <button type="submit" className="w-full bg-clinical-accent text-white py-3 rounded-lg font-bold hover:bg-green-700 transition-all shadow-lg shadow-clinical-accent/20">
-              {t.loginTitle}
+            <button type="submit" disabled={loading} className="w-full bg-clinical-accent text-white py-3 rounded-lg font-bold hover:bg-green-700 transition-all shadow-lg shadow-clinical-accent/20 disabled:opacity-50">
+              {loading ? <Loader2 className="animate-spin mx-auto" size={20} /> : (authMode === 'login' ? t.loginTitle : t.signUp)}
             </button>
           </form>
+
+          <div className="mt-6 space-y-3">
+            <button 
+              onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
+              className="w-full text-sm text-gray-500 hover:text-clinical-accent transition-colors"
+            >
+              {authMode === 'login' ? t.noAccount : t.hasAccount} <span className="font-bold underline">{authMode === 'login' ? t.signUp : t.loginTitle}</span>
+            </button>
+            
+            <div className="relative py-2">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-gray-400">Or</span></div>
+            </div>
+
+            <button 
+              onClick={handleDemoMode}
+              className="w-full bg-gray-50 text-gray-600 py-3 rounded-lg font-bold hover:bg-gray-100 transition-all border border-gray-200"
+            >
+              {t.demoMode}
+            </button>
+          </div>
         </motion.div>
       </div>
     );
@@ -542,8 +591,8 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {history
-                      .filter(c => c.complaint.toLowerCase().includes(searchQuery.toLowerCase()))
+                    {Array.isArray(history) && history
+                      .filter(c => c.complaint?.toLowerCase().includes(searchQuery.toLowerCase()))
                       .map((item) => {
                         const reportData = item.report ? JSON.parse(item.report) : null;
                         return (

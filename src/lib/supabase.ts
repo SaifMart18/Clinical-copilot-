@@ -22,6 +22,7 @@ export const supabase = {
     getSession: () => getSupabase().auth.getSession(),
     onAuthStateChange: (callback: any) => getSupabase().auth.onAuthStateChange(callback),
     signInWithPassword: (credentials: any) => getSupabase().auth.signInWithPassword(credentials),
+    signUp: (credentials: any) => getSupabase().auth.signUp(credentials),
     signOut: () => getSupabase().auth.signOut(),
   },
   from: (table: string) => getSupabase().from(table),
