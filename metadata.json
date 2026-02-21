@@ -1,0 +1,5 @@
+{
+  "name": "Clinical Copilot – Medical Dashboard AI",
+  "description": "An AI-powered medical dashboard for clinicians to generate structured patient reports and manage case history.",
+  "requestFramePermissions": []
+}
