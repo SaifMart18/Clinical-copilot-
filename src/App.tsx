@@ -173,7 +173,7 @@ export default function App() {
   const [history, setHistory] = useState<MedicalCase[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const t = translations[lang];
+  const t = translations[lang] || translations.en;
   const isAr = lang === 'ar';
 
   useEffect(() => {
@@ -217,6 +217,10 @@ export default function App() {
     if (!user) return;
     try {
       const res = await fetch(`/api/history/${user.id}`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server error: ${res.status}`);
+      }
       const data = await res.json();
       if (Array.isArray(data)) {
         setHistory(data);
@@ -280,13 +284,23 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, user_id: user?.id })
       });
+      
+      if (!caseRes.ok) {
+        const errorData = await caseRes.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to save case');
+      }
+      
       const { id: caseId } = await caseRes.json();
 
-      await fetch('/api/outputs', {
+      const outputRes = await fetch('/api/outputs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ case_id: caseId, content: result })
       });
+
+      if (!outputRes.ok) {
+        console.warn('Failed to save output, but case was created');
+      }
 
       fetchHistory();
     } catch (error) {
