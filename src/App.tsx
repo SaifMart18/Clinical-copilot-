@@ -23,6 +23,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { User, MedicalCase, ClinicalReport, Language } from './types';
 import { generateClinicalReport } from './services/geminiService';
+import { supabase } from './lib/supabase';
 
 // --- Translations ---
 
@@ -170,6 +171,32 @@ export default function App() {
   }, [lang]);
 
   useEffect(() => {
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          email: session.user.email || ''
+        });
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          email: session.user.email || ''
+        });
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
     if (user) {
       fetchHistory();
     }
@@ -185,28 +212,28 @@ export default function App() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const email = (e.target as any).email.value;
+    const password = (e.target as any).password.value;
+    
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: 'password' })
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-      
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || 'Login failed');
+
+      if (error) {
+        throw error;
       }
-      
+
       if (data.user) {
-        setUser(data.user);
-      } else {
-        throw new Error('No user data received');
+        setUser({
+          id: data.user.id,
+          email: data.user.email || ''
+        });
       }
     } catch (error: any) {
       console.error('Login error:', error);
-      alert(lang === 'ar' ? `فشل تسجيل الدخول: ${error.message}` : `Login failed: ${error.message}`);
+      alert(error.message);
     } finally {
       setLoading(false);
     }
@@ -318,7 +345,7 @@ export default function App() {
               <p className="text-xs text-gray-400">{t.practitioner}</p>
             </div>
           </div>
-          <button onClick={() => setUser(null)} className={`w-full flex items-center gap-3 px-4 py-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-all ${isAr ? 'flex-row-reverse' : ''}`}>
+          <button onClick={() => supabase.auth.signOut()} className={`w-full flex items-center gap-3 px-4 py-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-all ${isAr ? 'flex-row-reverse' : ''}`}>
             <LogOut size={18} />
             <span className="text-sm font-medium">{t.signOut}</span>
           </button>

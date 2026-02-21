@@ -10,11 +10,16 @@ const __dirname = path.dirname(__filename);
 const supabaseUrl = process.env.SUPABASE_URL || "";
 const supabaseKey = process.env.SUPABASE_ANON_KEY || "";
 
-if (!supabaseUrl || !supabaseKey) {
-  console.warn("⚠️ SUPABASE_URL or SUPABASE_ANON_KEY is missing. Database features will not work.");
-}
+let supabaseInstance: any = null;
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+function getSupabase() {
+  if (supabaseInstance) return supabaseInstance;
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("SUPABASE_URL or SUPABASE_ANON_KEY is missing in environment variables.");
+  }
+  supabaseInstance = createClient(supabaseUrl, supabaseKey);
+  return supabaseInstance;
+}
 
 async function startServer() {
   console.log("🚀 Starting server...");
@@ -30,51 +35,6 @@ async function startServer() {
 
   // --- API Routes ---
 
-  // Simple Auth (Demo purposes)
-  app.post("/api/auth/login", async (req, res) => {
-    const { email, password } = req.body;
-    
-    // Fallback for Demo Mode if Supabase is not configured
-    if (!supabaseUrl || !supabaseKey || supabaseUrl === "" || supabaseKey === "") {
-      console.log("🛠️ Supabase not configured. Using Demo Mode login.");
-      return res.json({ 
-        user: { 
-          id: "demo-user-id", 
-          email: email,
-          isDemo: true 
-        } 
-      });
-    }
-
-    try {
-      const { data: user, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("email", email)
-        .single();
-      
-      if (error && error.code !== "PGRST116") { // PGRST116 is "no rows returned"
-        return res.status(500).json({ error: error.message });
-      }
-
-      if (!user) {
-        const { data: newUser, error: insertError } = await supabase
-          .from("users")
-          .insert([{ email, password_hash: password }])
-          .select()
-          .single();
-        
-        if (insertError) return res.status(500).json({ error: insertError.message });
-        return res.json({ user: newUser });
-      }
-
-      res.json({ user });
-    } catch (err: any) {
-      console.error("Database error:", err);
-      res.status(500).json({ error: "Database connection failed. Please check your Supabase configuration." });
-    }
-  });
-
   app.post("/api/cases", async (req, res) => {
     const { user_id, complaint, symptoms, vitals, labs } = req.body;
     
@@ -82,7 +42,7 @@ async function startServer() {
       return res.json({ id: "demo-case-" + Math.random().toString(36).substring(7) });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from("cases")
       .insert([{ user_id, complaint, symptoms, vitals, labs }])
       .select()
@@ -99,7 +59,7 @@ async function startServer() {
       return res.json({ id: "demo-output-" + Math.random().toString(36).substring(7) });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from("outputs")
       .insert([{ case_id, content }])
       .select()
@@ -116,7 +76,7 @@ async function startServer() {
       return res.json([]);
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from("cases")
       .select(`
         *,
