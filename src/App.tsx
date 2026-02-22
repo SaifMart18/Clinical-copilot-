@@ -172,9 +172,20 @@ export default function App() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [history, setHistory] = useState<MedicalCase[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [envWarning, setEnvWarning] = useState<string | null>(null);
 
   const t = translations[lang] || translations.en;
   const isAr = lang === 'ar';
+
+  useEffect(() => {
+    const url = (import.meta as any).env.VITE_SUPABASE_URL;
+    const key = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
+    if (!url || !key) {
+      setEnvWarning(lang === 'ar' 
+        ? '⚠️ تنبيه: إعدادات قاعدة البيانات مفقودة. يرجى ضبط VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY في Vercel.' 
+        : '⚠️ Warning: Supabase configuration is missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel.');
+    }
+  }, [lang]);
 
   useEffect(() => {
     document.documentElement.dir = isAr ? 'rtl' : 'ltr';
@@ -214,7 +225,10 @@ export default function App() {
   }, [user]);
 
   const fetchHistory = async () => {
-    if (!user) return;
+    if (!user || user.id === 'demo-user') {
+      setHistory([]);
+      return;
+    }
     try {
       const res = await fetch(`/api/history/${user.id}`);
       if (!res.ok) {
@@ -255,9 +269,22 @@ export default function App() {
       }
     } catch (error: any) {
       console.error('Auth error:', error);
-      const message = error.message === 'Invalid login credentials' 
-        ? (lang === 'ar' ? 'بيانات الدخول غير صحيحة. يرجى إنشاء حساب جديد أو استخدام الوضع التجريبي.' : 'Invalid login credentials. Please sign up or use Demo Mode.')
-        : error.message;
+      let message = error.message;
+      
+      if (error.message === 'Invalid login credentials') {
+        message = lang === 'ar' 
+          ? 'بيانات الدخول غير صحيحة. تأكد من البريد الإلكتروني وكلمة المرور، أو قم بإنشاء حساب جديد إذا لم تكن قد فعلت ذلك بعد.' 
+          : "Invalid login credentials. Please check your email and password, or create a new account if you haven't already.";
+      } else if (error.message === 'Email not confirmed') {
+        message = lang === 'ar' 
+          ? 'لم يتم تأكيد البريد الإلكتروني بعد. يرجى تفعيل الحساب من بريدك أو استخدام الوضع التجريبي.' 
+          : 'Email not confirmed. Please check your inbox to verify your account or use Demo Mode.';
+      } else if (error.message.includes('rate limit exceeded')) {
+        message = lang === 'ar'
+          ? 'تم تجاوز حد المحاولات المسموح به. يرجى الانتظار قليلاً قبل المحاولة مرة أخرى أو استخدام الوضع التجريبي.'
+          : 'Rate limit exceeded. Please wait a moment before trying again or use Demo Mode.';
+      }
+      
       alert(message);
     } finally {
       setLoading(false);
@@ -279,30 +306,32 @@ export default function App() {
       setReport(result);
 
       // Save to DB
-      const caseRes = await fetch('/api/cases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, user_id: user?.id })
-      });
-      
-      if (!caseRes.ok) {
-        const errorData = await caseRes.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to save case');
+      if (user?.id !== 'demo-user') {
+        const caseRes = await fetch('/api/cases', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...formData, user_id: user?.id })
+        });
+        
+        if (!caseRes.ok) {
+          const errorData = await caseRes.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Failed to save case');
+        }
+        
+        const { id: caseId } = await caseRes.json();
+
+        const outputRes = await fetch('/api/outputs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ case_id: caseId, content: result })
+        });
+
+        if (!outputRes.ok) {
+          console.warn('Failed to save output, but case was created');
+        }
+
+        fetchHistory();
       }
-      
-      const { id: caseId } = await caseRes.json();
-
-      const outputRes = await fetch('/api/outputs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ case_id: caseId, content: result })
-      });
-
-      if (!outputRes.ok) {
-        console.warn('Failed to save output, but case was created');
-      }
-
-      fetchHistory();
     } catch (error) {
       console.error(error);
     } finally {
@@ -335,6 +364,11 @@ export default function App() {
           animate={{ opacity: 1, scale: 1 }}
           className={`bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-black/5 ${isAr ? 'text-right' : 'text-left'}`}
         >
+          {envWarning && (
+            <div className={`mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg text-orange-700 text-sm font-medium ${isAr ? 'text-right' : 'text-left'}`}>
+              {envWarning}
+            </div>
+          )}
           <div className="flex flex-col items-center mb-8">
             <div className="bg-clinical-accent p-4 rounded-2xl text-white mb-4 shadow-lg shadow-clinical-accent/20">
               <Stethoscope size={40} />
