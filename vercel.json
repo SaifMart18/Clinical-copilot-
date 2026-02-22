@@ -17,12 +17,16 @@
       "dest": "server.ts"
     },
     {
+      "src": "/auth/(.*)",
+      "dest": "server.ts"
+    },
+    {
       "src": "/assets/(.*)",
       "dest": "/assets/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "server.ts"
+      "dest": "/index.html"
     }
   ]
 }

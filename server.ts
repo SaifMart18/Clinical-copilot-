@@ -161,7 +161,8 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     console.log("📦 Running in production mode...");
-    const distPath = path.resolve(__dirname, "dist");
+    // In Vercel, the dist folder is usually in the same directory as the function or relative to process.cwd()
+    const distPath = path.resolve(process.cwd(), "dist");
     const indexPath = path.resolve(distPath, "index.html");
     
     import("fs").then(fs => {
