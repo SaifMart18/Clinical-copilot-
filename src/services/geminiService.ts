@@ -24,6 +24,7 @@ export async function generateClinicalReport(data: {
   symptoms: string;
   vitals: string;
   labs: string;
+  images?: { data: string; mimeType: string }[];
 }, lang: Language = 'en'): Promise<ClinicalReport> {
   const apiKey = getApiKey();
   
@@ -36,16 +37,35 @@ export async function generateClinicalReport(data: {
   const languageName = lang === 'ar' ? 'Arabic' : 'English';
   
   try {
+    const parts: any[] = [
+      {
+        text: `You are a clinical decision support assistant. Analyze the following patient data and provide a structured clinical report.
+        
+        IMPORTANT: The entire response MUST be in ${languageName}.
+        
+        Complaint: ${data.complaint}
+        Symptoms: ${data.symptoms}
+        Vitals: ${data.vitals}
+        Labs: ${data.labs}
+        
+        ${data.images && data.images.length > 0 ? 'I have also attached images of clinical findings, lab results, or imaging. Please analyze them carefully as part of the assessment.' : ''}`
+      }
+    ];
+
+    if (data.images && data.images.length > 0) {
+      data.images.forEach(img => {
+        parts.push({
+          inlineData: {
+            data: img.data,
+            mimeType: img.mimeType
+          }
+        });
+      });
+    }
+
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `You are a clinical decision support assistant. Analyze the following patient data and provide a structured clinical report.
-      
-      IMPORTANT: The entire response MUST be in ${languageName}.
-      
-      Complaint: ${data.complaint}
-      Symptoms: ${data.symptoms}
-      Vitals: ${data.vitals}
-      Labs: ${data.labs}`,
+      model: "gemini-2.0-flash-exp", // Using a model that supports multimodal input well
+      contents: { parts },
       config: {
         responseMimeType: "application/json",
         responseSchema: {

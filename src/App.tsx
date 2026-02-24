@@ -18,7 +18,10 @@ import {
   Search,
   ChevronRight,
   Loader2,
-  Languages
+  Languages,
+  Image as ImageIcon,
+  X,
+  Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, MedicalCase, ClinicalReport, Language } from './types';
@@ -73,7 +76,10 @@ const translations = {
     demoMode: 'Try Demo Mode',
     password: 'Password',
     contactSupport: 'Contact support to change your registered email.',
-    clinicPlaceholder: 'City Medical Center'
+    clinicPlaceholder: 'City Medical Center',
+    visualFindings: 'Visual Findings & Files',
+    uploadImages: 'Upload Images (X-rays, Labs, Wounds)',
+    remove: 'Remove'
   },
   ar: {
     title: 'المساعد السريري',
@@ -120,7 +126,10 @@ const translations = {
     demoMode: 'تجربة الوضع التجريبي',
     password: 'كلمة المرور',
     contactSupport: 'اتصل بالدعم لتغيير بريدك الإلكتروني المسجل.',
-    clinicPlaceholder: 'مركز المدينة الطبي'
+    clinicPlaceholder: 'مركز المدينة الطبي',
+    visualFindings: 'النتائج البصرية والملفات',
+    uploadImages: 'رفع صور (أشعة، تحاليل، جروح)',
+    remove: 'إزالة'
   }
 };
 
@@ -173,6 +182,7 @@ export default function App() {
   const [history, setHistory] = useState<MedicalCase[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [envWarning, setEnvWarning] = useState<string | null>(null);
+  const [images, setImages] = useState<{ data: string; mimeType: string; preview: string }[]>([]);
 
   const t = translations[lang] || translations.en;
   const isAr = lang === 'ar';
@@ -302,7 +312,10 @@ export default function App() {
     if (!formData.complaint) return;
     setLoading(true);
     try {
-      const result = await generateClinicalReport(formData, lang);
+      const result = await generateClinicalReport({
+        ...formData,
+        images: images.map(img => ({ data: img.data, mimeType: img.mimeType }))
+      }, lang);
       setReport(result);
 
       // Save to DB
@@ -349,6 +362,29 @@ export default function App() {
   const [report, setReport] = useState<ClinicalReport | null>(null);
 
   const toggleLang = () => setLang(prev => prev === 'en' ? 'ar' : 'en');
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach(f => {
+      const file = f as File;
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = (reader.result as string).split(',')[1];
+        setImages(prev => [...prev, {
+          data: base64String,
+          mimeType: file.type,
+          preview: URL.createObjectURL(file)
+        }]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+  };
 
   if (!user) {
     return (
@@ -537,6 +573,40 @@ export default function App() {
                       />
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Visual Findings Section */}
+              <div className="clinical-card space-y-6">
+                <div className={`flex items-center gap-2 text-purple-500 mb-2 ${isAr ? 'flex-row-reverse' : ''}`}>
+                  <ImageIcon size={20} />
+                  <h3 className="font-bold">{t.visualFindings}</h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {images.map((img, index) => (
+                    <div key={index} className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                      <img src={img.preview} alt="Clinical finding" className="w-full h-full object-cover" />
+                      <button 
+                        onClick={() => removeImage(index)}
+                        className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  
+                  <label className="aspect-square rounded-xl border-2 border-dashed border-gray-200 hover:border-clinical-accent hover:bg-clinical-accent/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-clinical-accent">
+                    <Upload size={24} />
+                    <span className="text-xs font-bold uppercase tracking-wider">{t.uploadImages}</span>
+                    <input 
+                      type="file" 
+                      multiple 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={handleImageUpload}
+                    />
+                  </label>
                 </div>
               </div>
 
