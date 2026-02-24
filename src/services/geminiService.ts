@@ -64,7 +64,7 @@ export async function generateClinicalReport(data: {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash-exp", // Using a model that supports multimodal input well
+      model: "gemini-3-flash-preview", // Using a supported model that handles multimodal input
       contents: { parts },
       config: {
         responseMimeType: "application/json",
