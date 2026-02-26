@@ -272,10 +272,20 @@ export default function App() {
       if (error) throw error;
 
       if (data.user) {
+        // If sign up was successful and confirmation is disabled in Supabase, 
+        // data.session will exist and the user is logged in.
         setUser({
           id: data.user.id,
           email: data.user.email || ''
         });
+        
+        if (authMode === 'signup' && !data.session) {
+          // This case happens if email confirmation is still ON in Supabase
+          const msg = lang === 'ar'
+            ? 'تم إنشاء الحساب! يرجى التحقق من بريدك الإلكتروني لتفعيله، أو قم بتعطيل "Confirm Email" في إعدادات Supabase للدخول المباشر.'
+            : 'Account created! Please check your email to confirm, or disable "Confirm Email" in Supabase settings for instant access.';
+          alert(msg);
+        }
       }
     } catch (error: any) {
       console.error('Auth error:', error);
@@ -285,10 +295,6 @@ export default function App() {
         message = lang === 'ar' 
           ? 'بيانات الدخول غير صحيحة. تأكد من البريد الإلكتروني وكلمة المرور، أو قم بإنشاء حساب جديد إذا لم تكن قد فعلت ذلك بعد.' 
           : "Invalid login credentials. Please check your email and password, or create a new account if you haven't already.";
-      } else if (error.message === 'Email not confirmed') {
-        message = lang === 'ar' 
-          ? 'لم يتم تأكيد البريد الإلكتروني بعد. يرجى تفعيل الحساب من بريدك أو استخدام الوضع التجريبي.' 
-          : 'Email not confirmed. Please check your inbox to verify your account or use Demo Mode.';
       } else if (error.message.includes('rate limit exceeded')) {
         message = lang === 'ar'
           ? 'تم تجاوز حد المحاولات المسموح به. يرجى الانتظار قليلاً قبل المحاولة مرة أخرى أو استخدام الوضع التجريبي.'
